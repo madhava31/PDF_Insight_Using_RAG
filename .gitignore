@@ -1,9 +1,5 @@
-# Python
+# Virtual environment
+madhav/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Virtual environments
-madhav/
-env/
+.env
