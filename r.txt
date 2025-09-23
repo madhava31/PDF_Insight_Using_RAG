@@ -1,0 +1,12 @@
+langchain
+langchain_community
+faiss-cpu
+pypdf
+python-dotenv
+sentence-transformers
+streamlit
+gradio
+# Hugging Face Integration
+langchain-huggingface
+transformers
+huggingface-hub
