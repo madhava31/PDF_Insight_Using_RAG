@@ -1,5 +1,8 @@
+from langchain_community.chat_models import ChatHuggingFace
+from langchain_community.llms import HuggingFaceEndpoint
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from dotenv import load_dotenv
+import os
 from langchain_core.prompts import PromptTemplate
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -7,6 +10,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
+
 #load the pdf
 pdf_path = "data/sample.pdf"
 loader = PyPDFLoader(pdf_path)
@@ -32,6 +36,7 @@ llm = HuggingFaceEndpoint(
     repo_id="google/gemma-2-2b-it",
     task="text-generation",
     max_new_tokens=256,
+     huggingfacehub_api_token=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
     temperature=0.3
 )
 

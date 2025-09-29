@@ -126,7 +126,14 @@ with gr.Blocks(theme="default") as demo:
         pdf_file = gr.File(label="Upload PDF", file_types=[".pdf"])
         load_btn = gr.Button("Load PDF")
 
-    status = gr.Textbox(label="Status", interactive=False)
+    # Make status bigger
+    status = gr.Textbox(
+        label="Status",
+        interactive=False,   # read-only
+        lines=2,             # initial height in rows
+        max_lines=5          # optional: allow expansion
+    )
+
     # CHANGE #1: Added type="messages"
     chatbot = gr.Chatbot(label="Chat with PDF", height=400, type="messages")
     query = gr.Textbox(label="Ask a question", placeholder="Type your question here...")
