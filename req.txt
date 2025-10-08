@@ -15,6 +15,7 @@ pypdf
 
 # Web UI
 gradio
+flask
 
 # Env variables
 python-dotenv
