@@ -163,4 +163,14 @@ with gr.Blocks(theme="default") as demo:
 
 # -----------------------------------------
 if __name__ == "__main__":
-    demo.launch()
+    import os
+    # Render provides the port via the PORT env var
+    port = int(os.environ.get("PORT", 7860))  # default 7860 for local dev
+    host = "0.0.0.0"
+
+    # Optional: improve stability when deployed
+    demo.queue()  # enable request queueing (optional)
+
+    # Launch binding to host + port from env
+    demo.launch(server_name=host, server_port=port, share=False)
+
