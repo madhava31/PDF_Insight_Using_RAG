@@ -1,3 +1,4 @@
+import threading
 import gradio as gr
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
@@ -9,6 +10,7 @@ from langchain_core.runnables import RunnableParallel, RunnablePassthrough, Runn
 from langchain_core.output_parsers import StrOutputParser
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 import os
+from flask import Flask
 load_dotenv()
 # -----------------------------------------
 # Load environment variables
@@ -162,6 +164,16 @@ with gr.Blocks(theme="default") as demo:
     )
 
 # -----------------------------------------
+app = Flask(__name__)
+
+def launch_gradio():
+    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)), share=False)
+
+threading.Thread(target=launch_gradio).start()
+
+@app.route("/")
+def home():
+    return "Gradio ML Model running!"
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))  # Render gives us a PORT env var
-    demo.launch(server_name="0.0.0.0", server_port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))
