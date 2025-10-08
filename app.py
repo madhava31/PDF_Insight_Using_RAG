@@ -164,16 +164,9 @@ with gr.Blocks(theme="default") as demo:
     )
 
 # -----------------------------------------
-app = Flask(__name__)
-
-def launch_gradio():
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)), share=False)
-
-threading.Thread(target=launch_gradio).start()
-
-@app.route("/")
-def home():
-    return "Gradio ML Model running!"
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))
+    # Get the port from the environment variable (Render sets this)
+    port = int(os.environ.get("PORT", 4000))
+    print(f"Starting Gradio server on 0.0.0.0:{port}")
+    # Launch Gradio in the main thread to allow Render to detect the open port
+    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
