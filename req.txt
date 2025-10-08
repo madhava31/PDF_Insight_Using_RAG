@@ -1,0 +1,20 @@
+# Core LangChain ecosystem
+langchain
+langchain-community
+langchain-huggingface
+langchain-core
+
+# Embeddings & LLMs
+sentence-transformers       # pulls in all-MiniLM-L6-v2
+transformers                # needed to load Gemma & pipeline
+huggingface-hub             # interface to HF Hub
+faiss-cpu                    # vectorstore
+
+# PDF loading
+pypdf
+
+# Web UI
+gradio
+
+# Env variables
+python-dotenv
