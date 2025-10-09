@@ -246,4 +246,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     print(f"Starting Gradio server on 0.0.0.0:{port}")
     # Launch Gradio in the main thread to allow Render to detect the open port
-    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
+    # Added inbrowser=False to ensure Gradio binds the port immediately without relying on browser launch capabilities.
+    demo.launch(server_name="0.0.0.0", server_port=port, share=False, inbrowser=False)
