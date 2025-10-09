@@ -122,5 +122,11 @@ with gr.Blocks(theme="default") as demo:
     submit_btn.click(ask_question_and_update, inputs=[chatbot, query], outputs=[chatbot, query])
 
 # ✅ Render needs a fixed host and port
+def predict(text):
+    return f"Model output: {text}"
+
+iface = gr.Interface(fn=predict, inputs="text", outputs="text")
+
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
+    port = int(os.environ.get("PORT", 7860))
+    iface.launch(server_name="0.0.0.0", server_port=port)
