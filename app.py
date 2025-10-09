@@ -58,7 +58,7 @@ def format_docs_with_history(retrieved_docs, history):
 
 # Load LLM
 llm = HuggingFaceEndpoint(
-    repo_id="google/gemma-2-2b-it",
+    repo_id="sentence-transformers/all-MiniLM-L6-v2",
     task="conversational",
     model_kwargs={"api_key": api_key}
 )
