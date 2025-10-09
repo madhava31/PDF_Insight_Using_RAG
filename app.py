@@ -3,12 +3,12 @@ import gradio as gr
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+# Changed to use Inference Embeddings to reduce local memory consumption
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace, HuggingFaceInferenceEmbeddings 
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 import os
 import sys
 
@@ -18,7 +18,7 @@ load_dotenv()
 # Load environment variables
 api_key = os.getenv("HUGGINGFACE_TOKEN_API")
 if not api_key:
-    print("❌ HUGGINGFACE_TOKEN_API not found. The application will not be able to query the LLM.")
+    print("❌ HUGGINGFACE_TOKEN_API not found. The application will not be able to query the LLM or Embeddings API.")
 
 
 # -----------------------------------------
@@ -28,10 +28,19 @@ splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 # Load Embeddings Robustly
 embeddings = None
 try:
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    # CRITICAL CHANGE: Using HuggingFaceInferenceEmbeddings
+    # This uses the API key to offload the model loading/execution to the HuggingFace Inference API,
+    # solving the "Out of memory" error on small instances.
+    if api_key:
+        embeddings = HuggingFaceInferenceEmbeddings(
+            api_key=api_key, 
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+    else:
+        print("Embeddings initialization skipped due to missing API key.", file=sys.stderr)
 except Exception as e:
     # Do not exit the process, but log the error.
-    print(f"FATAL EMBEDDINGS ERROR: Could not load HuggingFaceEmbeddings. Error: {e}", file=sys.stderr)
+    print(f"FATAL EMBEDDINGS ERROR: Could not load HuggingFaceInferenceEmbeddings. Error: {e}", file=sys.stderr)
 
 
 # -----------------------------------------
@@ -39,6 +48,7 @@ except Exception as e:
 load_pdf_runnable = RunnableLambda(lambda pdf_path: PyPDFLoader(pdf_path).load())
 split_runnable = RunnableLambda(lambda docs: splitter.split_documents(docs))
 # vectorstore_runnable will rely on the global 'embeddings' variable
+# NOTE: This will fail later if embeddings is None, which is handled in load_pdf
 vectorstore_runnable = RunnableLambda(lambda docs: FAISS.from_documents(docs, embeddings))
 
 # -----------------------------------------
@@ -117,7 +127,7 @@ def load_pdf(file):
     
     # Critical check for embeddings before processing
     if embeddings is None:
-        return "❌ The document processing component failed to load at startup. Check console logs for details.", []
+        return "❌ The document processing component (Embeddings) failed to load at startup. Check API key and console logs for details.", []
 
     pdf_path = file.name
     
