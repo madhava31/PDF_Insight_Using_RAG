@@ -17,5 +17,7 @@ pypdf
 gradio
 flask
 
-# Env variables
-python-dotenv
+
+fastapi
+uvicorn
+
