@@ -6,25 +6,29 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint, ChatHuggingFace
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
 # Load environment variables
 load_dotenv()
-api_key = os.getenv("HUGGINGFACE_TOKEN_API")
-if not api_key:
-    raise ValueError("❌ HUGGINGFACE_TOKEN_API not found. Set it in Render Secrets.")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_TOKEN_API")
+if not HUGGINGFACE_API_KEY:
+    raise ValueError("❌ HUGGINGFACE_TOKEN_API not found in environment variables!")
 
-# Step 1: Splitter & Embeddings
+# Use Render's PORT
+PORT = int(os.environ.get("PORT", 7860))
+
+# ------------------- LangChain Setup ------------------- #
+# Split PDF into chunks
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-# Step 2: Runnables for PDF processing
+# Runnables
 load_pdf_runnable = RunnableLambda(lambda pdf_path: PyPDFLoader(pdf_path).load())
 split_runnable = RunnableLambda(lambda docs: splitter.split_documents(docs))
 vectorstore_runnable = RunnableLambda(lambda docs: FAISS.from_documents(docs, embeddings))
 
-# Step 3: Prompt Template
+# Prompt template
 prompt = PromptTemplate(
     template="""
 You are a helpful assistant.
@@ -38,6 +42,11 @@ Transcript Context:
 {context}
 
 Question: {question}
+
+Instructions:
+- If the new question is about previous questions or answers, use ONLY the conversation history.
+- If the question is about the PDF, use the PDF context.
+- If you cannot find the answer in either, respond with "I don't know."
 """,
     input_variables=["history", "context", "question"]
 )
@@ -51,11 +60,11 @@ def format_history(history):
 def format_docs_with_history(retrieved_docs, history):
     return "\n\n".join(doc.page_content for doc in retrieved_docs)
 
-# Step 4: LLM via HuggingFace Inference API (tiny model)
+# Load LLM
 llm = HuggingFaceEndpoint(
-    repo_id="google/flan-t5-small",  # lightweight
-    task="text2text-generation",
-    model_kwargs={"api_key": api_key, "max_new_tokens": 200}
+    repo_id="google/gemma-2-2b-it",
+    task="conversational",
+    model_kwargs={"api_key": HUGGINGFACE_API_KEY}
 )
 model = ChatHuggingFace(llm=llm)
 parser = StrOutputParser()
@@ -65,12 +74,13 @@ conversation_history = []
 retriever = None
 main_chain = None
 
-# PDF loader
+# ------------------- PDF Loader ------------------- #
 def load_pdf(file):
     global retriever, main_chain, conversation_history
     conversation_history = []
     if file is None:
         return "⚠️ Please upload a PDF first."
+    
     pdf_path = file.name
     retriever = (load_pdf_runnable | split_runnable | vectorstore_runnable).invoke(pdf_path).as_retriever(
         search_type="similarity",
@@ -84,7 +94,7 @@ def load_pdf(file):
     main_chain = parallel_chain | prompt | model | parser
     return f"✅ PDF loaded successfully: {file.name}. You can now ask questions!"
 
-# Chat logic
+# ------------------- Chat Logic ------------------- #
 def ask_question(question):
     global conversation_history, main_chain
     if main_chain is None:
@@ -103,20 +113,22 @@ def ask_question_and_update(chat_history, question):
     ]
     return chat_history, ""
 
-# Gradio UI
+# ------------------- Gradio UI ------------------- #
 with gr.Blocks() as demo:
     gr.Markdown("## 📚 PDF Insight RAG Model")
+    
     with gr.Row():
         pdf_file = gr.File(label="Upload PDF", file_types=[".pdf"])
         load_btn = gr.Button("Load PDF")
-    status = gr.Textbox(label="Status", interactive=False, lines=2)
+    
+    status = gr.Textbox(label="Status", interactive=False, lines=2, max_lines=5)
     chatbot = gr.Chatbot(label="Chat with PDF", height=400, type="messages")
     query = gr.Textbox(label="Ask a question", placeholder="Type your question here...")
     submit_btn = gr.Button("Ask")
+    
     load_btn.click(load_pdf, inputs=pdf_file, outputs=status)
     submit_btn.click(ask_question_and_update, inputs=[chatbot, query], outputs=[chatbot, query])
 
-# Launch
+# ------------------- Launch ------------------- #
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+    demo.launch(server_name="0.0.0.0", server_port=PORT, share=False)
