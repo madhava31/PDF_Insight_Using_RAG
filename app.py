@@ -1,7 +1,9 @@
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 import gradio as gr
-from dotenv import load_dotenv
+
+# LangChain and PDF-related imports
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint, ChatHuggingFace
@@ -10,23 +12,21 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
-# =========================================================
-# 1️⃣ Load environment variables
-# =========================================================
+# =====================================================
+# Load Environment Variables
+# =====================================================
 load_dotenv()
 api_key = os.getenv("HUGGINGFACE_TOKEN_API")
-if not api_key:
-    raise ValueError("❌ HUGGINGFACE_TOKEN_API not found. Please set it in Render Secrets.")
 
-# =========================================================
-# 2️⃣ Initialize text splitter & embeddings
-# =========================================================
+if not api_key:
+    raise ValueError("❌ HUGGINGFACE_TOKEN_API not found. Set it in Render Secrets.")
+
+# =====================================================
+# Embeddings, Splitter, and LLM Setup
+# =====================================================
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-# =========================================================
-# 3️⃣ Define prompt
-# =========================================================
 prompt = PromptTemplate(
     template="""
 You are a helpful assistant.
@@ -40,18 +40,11 @@ Transcript Context:
 {context}
 
 Question: {question}
-
-Instructions:
-- If the new question is about previous questions or answers, use ONLY the conversation history.
-- If the question is about the PDF, use the PDF context.
-- If you cannot find the answer in either, respond with "I don't know."
 """,
     input_variables=["history", "context", "question"]
 )
 
-# =========================================================
-# 4️⃣ Helper functions
-# =========================================================
+# Helper functions
 def format_history(history):
     if not history:
         return "No prior conversation."
@@ -60,9 +53,7 @@ def format_history(history):
 def format_docs_with_history(retrieved_docs, history):
     return "\n\n".join(doc.page_content for doc in retrieved_docs)
 
-# =========================================================
-# 5️⃣ Load LLM
-# =========================================================
+# Load LLM
 llm = HuggingFaceEndpoint(
     repo_id="google/gemma-2-2b-it",
     task="conversational",
@@ -71,27 +62,25 @@ llm = HuggingFaceEndpoint(
 model = ChatHuggingFace(llm=llm)
 parser = StrOutputParser()
 
-# =========================================================
-# 6️⃣ Global state
-# =========================================================
+# =====================================================
+# Conversation + Chain Logic
+# =====================================================
 conversation_history = []
 retriever = None
 main_chain = None
 
-# =========================================================
-# 7️⃣ PDF Loader
-# =========================================================
 def load_pdf(file):
     global retriever, main_chain, conversation_history
     conversation_history = []
+
     if file is None:
         return "⚠️ Please upload a PDF first."
 
     pdf_path = file.name
     docs = PyPDFLoader(pdf_path).load()
-    chunks = splitter.split_documents(docs)
-    db = FAISS.from_documents(chunks, embeddings)
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+    split_docs = splitter.split_documents(docs)
+    vectorstore = FAISS.from_documents(split_docs, embeddings)
+    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 
     parallel_chain = RunnableParallel({
         "context": retriever | RunnableLambda(lambda docs: format_docs_with_history(docs, conversation_history)),
@@ -102,13 +91,11 @@ def load_pdf(file):
     main_chain = parallel_chain | prompt | model | parser
     return f"✅ PDF loaded successfully: {file.name}. You can now ask questions!"
 
-# =========================================================
-# 8️⃣ Ask question logic
-# =========================================================
 def ask_question(question):
     global conversation_history, main_chain
     if main_chain is None:
         return "⚠️ Please upload a PDF first."
+
     response = main_chain.invoke(question).strip()
     conversation_history.append({"question": question, "answer": response})
     return response
@@ -123,38 +110,39 @@ def ask_question_and_update(chat_history, question):
     ]
     return chat_history, ""
 
-# =========================================================
-# 9️⃣ Build Gradio UI
-# =========================================================
+# =====================================================
+# Gradio UI
+# =====================================================
 with gr.Blocks(theme="default") as gradio_app:
-    gr.Markdown("## 📘 PDF Insight RAG Assistant")
+    gr.Markdown("## 📚 PDF Insight RAG — Chat with your PDF")
     with gr.Row():
         pdf_file = gr.File(label="Upload PDF", file_types=[".pdf"])
         load_btn = gr.Button("Load PDF")
+
     status = gr.Textbox(label="Status", interactive=False, lines=2)
-    chatbot = gr.Chatbot(label="Chat with your PDF", height=400, type="messages")
+    chatbot = gr.Chatbot(label="Chat", height=400, type="messages")
     query = gr.Textbox(label="Ask a question", placeholder="Type your question here...")
     submit_btn = gr.Button("Ask")
 
     load_btn.click(load_pdf, inputs=pdf_file, outputs=status)
     submit_btn.click(ask_question_and_update, inputs=[chatbot, query], outputs=[chatbot, query])
 
-# =========================================================
-# 🔟 FastAPI wrapper to expose Gradio on Render
-# =========================================================
+# =====================================================
+# FastAPI App Wrapper for Render
+# =====================================================
 app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"message": "🚀 PDF Insight RAG is running on Render!"}
+    return {"message": "🚀 PDF Insight RAG is running successfully on Render!"}
 
-# Mount Gradio interface to FastAPI
+# Mount Gradio interface on FastAPI
 app = gr.mount_gradio_app(app, gradio_app, path="/")
 
-# =========================================================
-# 🚀 Launch Uvicorn server
-# =========================================================
+# =====================================================
+# Launch Server (Render-compatible)
+# =====================================================
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 7860))
+    port = int(os.environ.get("PORT", 7860))  # Render assigns PORT automatically
     uvicorn.run(app, host="0.0.0.0", port=port)
