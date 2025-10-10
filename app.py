@@ -145,17 +145,12 @@ with gr.Blocks(theme="default") as demo:
 # ================================
 app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message": "🚀 PDF Insight RAG is running successfully!"}
+with gr.Blocks() as demo:
+    gr.Markdown("Hello PDF RAG!")
 
-# Mount Gradio at /gradio
 app = gr.mount_gradio_app(app, demo, path="/gradio")
 
-# ================================
-# Launch Server (local / Render)
-# ================================
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 7860))  # Render automatically assigns PORT
+    port = int(os.environ.get("PORT", 7860))
     uvicorn.run(app, host="0.0.0.0", port=port)
