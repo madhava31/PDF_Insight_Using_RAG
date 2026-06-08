@@ -1,14 +1,13 @@
 # Core LangChain ecosystem
 langchain
 langchain-community
-langchain-huggingface
 langchain-core
 
-# Embeddings & LLMs
-sentence-transformers       # pulls in all-MiniLM-L6-v2
-transformers                # needed to load Gemma & pipeline
-huggingface-hub             # interface to HF Hub
-faiss-cpu                    # vectorstore
+# OpenAI-compatible client
+openai
+
+python-dotenv
+jinja2
 
 # PDF loading
 pypdf
