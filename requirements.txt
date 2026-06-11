@@ -1,7 +1,7 @@
 # Core LangChain ecosystem
-langchain
 langchain-community
 langchain-core
+langchain-text-splitters
 
 # OpenAI-compatible client
 openai
@@ -14,9 +14,6 @@ pypdf
 
 # Web UI
 gradio
-flask
-
-
 fastapi
 uvicorn
 

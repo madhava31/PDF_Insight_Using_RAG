@@ -1,211 +1,95 @@
-# PDF_Insight_Using_RAG
-Project Overview
+# PDF Insight Using RAG
 
-PDF Insight RAG is an AI-powered application that allows users to upload a PDF and ask questions about its content.
+PDF Insight is a web application for uploading a PDF and asking questions about
+its contents. It extracts and cleans the document text, splits it into chunks,
+selects relevant chunks for each question, and sends the grounded context to an
+OpenAI-compatible language model.
 
-The system uses Retrieval-Augmented Generation (RAG) to retrieve relevant text from the PDF and generate accurate answers using a Large Language Model.
+## Features
 
-This ensures answers are grounded in the document instead of hallucinating information.
+- Upload and process text-based PDF files
+- Preserve page and source metadata while chunking
+- Ask follow-up questions through a Gradio chat interface
+- Configure any OpenAI-compatible API endpoint and model
+- Run locally with FastAPI/Uvicorn or deploy on Render
 
-#🚀 Features
+## Project Structure
 
-Upload any PDF document
+```text
+.
+|-- app.py
+|-- config/
+|   |-- pdf_processor.py
+|   |-- settings.py
+|   `-- templates.py
+|-- templates/
+|   |-- system_prompt.jinja
+|   `-- user_prompt.jinja
+|-- requirements.txt
+`-- render.yaml
+```
 
-Ask questions about the document
+## Requirements
 
-AI retrieves relevant context from the PDF
+- Python 3.10 or newer
+- An API key for an OpenAI-compatible model provider
 
-Answers are generated using an LLM
+## Local Setup
 
-Maintains conversation history
+1. Clone the repository and enter the project directory:
 
-Clean chat interface
+   ```powershell
+   git clone https://github.com/madhava31/PDF_Insight_Using_RAG-2.git
+   cd PDF_Insight_Using_RAG-2
+   ```
 
-Deployable using FastAPI + Gradio
+2. Create and activate a virtual environment:
 
-#🧠 Technologies Used
-Backend
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
 
-FastAPI – API framework
+3. Install the dependencies:
 
-LangChain – RAG pipeline orchestration
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
-AI / LLM
+4. Create a `.env` file:
 
-Google Gemma 2B Instruct
+   ```env
+   OPENAI_API_KEY=your_api_key
+   OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1
+   LLM_MODEL=openai/gpt-oss-120b
+   ```
 
-Accessed via HuggingFace Endpoint
+   `NVIDIA_API_KEY` and `API_KEY` are also accepted as API key variable names.
 
-Embeddings
+5. Start the application:
 
-sentence-transformers/all-MiniLM-L6-v2
+   ```powershell
+   python app.py
+   ```
 
-Vector Database
+6. Open `http://localhost:7860/gradio`.
 
-FAISS – used to store and retrieve document embeddings
+## How It Works
 
-Document Processing
+1. `PyPDFLoader` extracts text from the uploaded PDF.
+2. `EnhancedPDFProcessor` cleans the text and splits it into overlapping chunks.
+3. The application scores chunks using terms from the user's question.
+4. The four highest-scoring chunks are added to the prompt as context.
+5. The configured language model generates an answer grounded in that context.
 
-PyPDFLoader – loads PDF files
+## Deployment
 
-RecursiveCharacterTextSplitter – splits large documents into smaller chunks
+The included `render.yaml` installs dependencies from `requirements.txt` and
+starts the application with `python app.py`. Add the API key and optional model
+settings as environment variables in the Render dashboard.
 
-Frontend
+## Notes
 
-Gradio – interactive chat UI
-
-Deployment
-
-Render
-
-#🏗️ Project Architecture
-User Uploads PDF
-        │
-        ▼
-PDF Loader (PyPDFLoader)
-        │
-        ▼
-Text Splitter
-(RecursiveCharacterTextSplitter)
-        │
-        ▼
-Embeddings
-(HuggingFace Sentence Transformers)
-        │
-        ▼
-Vector Database
-(FAISS)
-        │
-        ▼
-Retriever
-        │
-        ▼
-Prompt Template
-        │
-        ▼
-LLM (Gemma 2B via HuggingFace)
-        │
-        ▼
-Generated Answer
-⚙️ How the System Works
-Step 1 — Upload PDF
-
-User uploads a PDF using the Gradio interface.
-
-Step 2 — Document Processing
-
-The system:
-
-Loads the PDF
-
-Splits it into smaller chunks
-
-chunk_size = 1000
-chunk_overlap = 200
-Step 3 — Create Embeddings
-
-Each chunk is converted into vector embeddings using:
-
-sentence-transformers/all-MiniLM-L6-v2
-Step 4 — Store in FAISS
-
-All embeddings are stored in FAISS vector database.
-
-This allows fast semantic search.
-
-Step 5 — Retrieval
-
-When the user asks a question:
-
-The question is converted into an embedding
-
-FAISS retrieves top 4 relevant chunks
-
-k = 4
-Step 6 — Prompt Construction
-
-The model receives:
-
-Retrieved context
-
-Conversation history
-
-User question
-
-Prompt Example:
-
-You are a helpful assistant.
-Answer ONLY from the provided transcript context and conversation history.
-
-Conversation History:
-{history}
-
-Transcript Context:
-{context}
-
-Question:
-{question}
-Step 7 — Answer Generation
-
-The retrieved context is passed to Gemma 2B Instruct model, which generates the final answer.
-
-This allows the model to understand previous interactions.
-
-📂 Project Structure
-PDF_Insight_RAG
-│
-├── app.py
-├── requirements.txt
-├── .env
-├── README.md
-│
-└── modules
-      ├── rag.py
-      ├── embeddings.py
-      └── utils.py
-🔑 Environment Variables
-
-Create a .env file:
-
-HUGGINGFACE_TOKEN_API=your_huggingface_token
-🖥️ Installation
-1️⃣ Clone the Repository
-git clone https://github.com/your-username/pdf-insight-rag.git
-cd pdf-insight-rag
-2️⃣ Create Virtual Environment
-python -m venv venv
-
-Activate:
-
-venv\Scripts\activate
-3️⃣ Install Dependencies
-pip install -r requirements.txt
-4️⃣ Run the Application
-python app.py
-
-or
-
-uvicorn app:app --reload
-
-#📊 Example Use Cases
-
-Research paper analysis
-
-Legal document search
-
-Study material Q&A
-
-Business reports analysis
-
-Policy document understanding
-
-⚠️ Limitations
-
-Works best with text-based PDFs
-
-Very large PDFs may increase processing time
-
-Answers depend on retrieved context quality
-
-
-https://github.com/madhava31
+- Scanned PDFs require OCR before this application can extract their text.
+- `.env`, virtual environments, caches, and editor settings are ignored by Git.
+- Do not commit API keys or other credentials.

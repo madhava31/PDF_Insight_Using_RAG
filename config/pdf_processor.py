@@ -37,7 +37,7 @@ class EnhancedPDFProcessor:
         self.enable_preprocessing = enable_preprocessing
         self.enable_semantic_split = enable_semantic_split
 
-        # Semantic splitter: tries paragraphs → sentences → words → chars
+        # Semantic splitter tries paragraphs, sentences, words, then characters.
         separators = ["\n\n", "\n", ". ", " ", ""] if enable_semantic_split else [""]
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,

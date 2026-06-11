@@ -45,7 +45,7 @@ def load_pdf(file_path):
     pdf_chunks = []
 
     if file_path is None:
-        return "⚠️ Please upload a PDF first."
+        return "Please upload a PDF first."
 
     try:
         # Use enhanced processor for better chunking and metadata
@@ -53,22 +53,22 @@ def load_pdf(file_path):
         summary = pdf_processor.get_chunk_summary(pdf_chunks)
         
         return (
-            f"✅ PDF loaded successfully!\n"
-            f"📊 Chunks: {summary['total_chunks']} | "
+            f"PDF loaded successfully!\n"
+            f"Chunks: {summary['total_chunks']} | "
             f"Pages: {summary['pages_extracted']} | "
             f"Avg chunk: {int(summary['avg_chunk_size'])} chars"
         )
     except ValueError as e:
-        return f"⚠️ Error loading PDF: {e}"
+        return f"Error loading PDF: {e}"
 
 def ask_question(question):
     global conversation_history, pdf_chunks
 
     if client is None:
-        return "⚠️ Set OPENAI_API_KEY or NVIDIA_API_KEY in your .env file first."
+        return "Set OPENAI_API_KEY or NVIDIA_API_KEY in your .env file first."
 
     if not pdf_chunks:
-        return "⚠️ Please upload a PDF first."
+        return "Please upload a PDF first."
 
     if not question.strip():
         return "Please ask a question about the PDF."
@@ -131,15 +131,15 @@ def ask_question_and_update(chat_history, question):
     if not question.strip():
         return chat_history, ""
 
-    # 1️⃣ First, show the user's question immediately
+    # First, show the user's question immediately.
     chat_history.append({"role": "user", "content": question})
     yield chat_history, ""  # This updates the chatbox immediately
 
-    # 2️⃣ Then process the answer
+    # Then process the answer.
     answer = ask_question(question)
     chat_history.append({"role": "assistant", "content": answer})
 
-    # 3️⃣ Update chat with the assistant's response
+    # Update chat with the assistant's response.
     yield chat_history, ""
 
 
@@ -148,7 +148,7 @@ def ask_question_and_update(chat_history, question):
 # Gradio UI
 # ================================
 with gr.Blocks() as demo:
-    gr.Markdown("## 📚 PDF Insight RAG — Chat with your PDF")
+    gr.Markdown("## PDF Insight RAG - Chat with your PDF")
     
     with gr.Row(equal_height=True):
         with gr.Column(scale=1):
