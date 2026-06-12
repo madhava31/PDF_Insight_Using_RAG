@@ -1,4 +1,12 @@
-"""Enhanced PDF loading and chunking with metadata and preprocessing."""
+"""Enhanced PDF Loading and Chunking Module
+
+This module provides EnhancedPDFProcessor which:
+- Loads PDFs using LangChain's PyPDFLoader
+- Preprocesses text (removes headers, footers, normalizes whitespace)
+- Splits documents into chunks with configurable size and overlap
+- Preserves metadata (page numbers, source filename, chunk IDs)
+- Returns LangChain Document objects with enriched metadata
+"""
 import os
 import re
 from typing import List
@@ -23,8 +31,7 @@ class EnhancedPDFProcessor:
         enable_preprocessing: bool = True,
         enable_semantic_split: bool = True,
     ):
-        """
-        Initialize processor.
+        """Initialize processor.
 
         Args:
             chunk_size: Target chunk size in characters
