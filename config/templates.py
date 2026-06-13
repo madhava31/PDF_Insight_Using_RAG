@@ -1,4 +1,8 @@
-"""Jinja2 template loader for prompts."""
+"""Jinja2 Template Loader Module
+
+This module provides TemplateLoader for rendering Jinja2 templates from files.
+Templates are used to compose system and user prompts with context, history, and questions.
+"""
 import os
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
@@ -24,6 +28,8 @@ class TemplateLoader:
     def render(self, template_name: str, context: dict) -> str:
         """
         Render a template with the given context.
+        
+        This method loads a Jinja2 template by name and renders it with the provided variables.
         
         Args:
             template_name: Name of the template file (without .jinja extension)

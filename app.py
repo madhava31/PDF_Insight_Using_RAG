@@ -1,3 +1,15 @@
+"""PDF Insight RAG - Main Application
+
+This module provides a web interface for uploading PDFs and asking questions about their contents.
+It uses a LangChain-style runnable chain (RunnableParallel | prompt | model) to compose the RAG pipeline.
+
+Components:
+- Gradio UI: interactive chat interface for users
+- FastAPI: serves the Gradio app and handles HTTP requests
+- RAGChain: orchestrates PDF processing, retrieval, prompting, and LLM calls
+- EnhancedPDFProcessor: loads and chunks PDFs with metadata preservation
+- TemplateLoader: renders Jinja2 prompts for system and user messages
+"""
 import os
 from fastapi import FastAPI
 import gradio as gr
@@ -7,6 +19,7 @@ from openai import OpenAI
 from config.settings import OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL
 from config.templates import TemplateLoader
 from config.pdf_processor import EnhancedPDFProcessor
+from config.chain import RAGChain
 
 
 # ================================
@@ -21,125 +34,130 @@ pdf_processor = EnhancedPDFProcessor(
 template_loader = TemplateLoader()
 client = OpenAI(base_url=OPENAI_BASE_URL, api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
+# Instantiate the RAG chain (runnable-based: RunnableParallel | prompt | model)
+rag_chain = RAGChain(pdf_processor=pdf_processor, template_loader=template_loader, client=client, top_k=4)
+
 # ================================
 # Helper Functions
 # ================================
 def format_history(history):
+    """Format conversation history into a readable string.
+    
+    Args:
+        history: List of dicts with 'question' and 'answer' keys
+        
+    Returns:
+        Formatted history string for inclusion in prompts
+    """
     if not history:
         return "No prior conversation."
     return "\n".join([f"Q: {h['question']}\nA: {h['answer']}" for h in history])
 
 def format_docs_with_history(retrieved_docs, history):
+    """Join retrieved documents into a single context string (not currently used).
+    
+    Args:
+        retrieved_docs: List of Document objects with page_content
+        history: Conversation history (unused in this function)
+        
+    Returns:
+        Concatenated document texts separated by newlines
+    """
     return "\n\n".join(doc.page_content for doc in retrieved_docs)
 
 # ================================
 # Conversation + Chain Logic
 # ================================
-conversation_history = []
-pdf_chunks = []
 
 def load_pdf(file_path):
-    """Load PDF with enhanced processing and metadata preservation."""
-    global conversation_history, pdf_chunks
-    conversation_history = []
-    pdf_chunks = []
-
+    """Load a PDF file, process it into chunks, and update the RAG chain.
+    
+    This function:
+    1. Accepts a PDF file path from Gradio file upload
+    2. Passes it to rag_chain.load_pdf() which calls EnhancedPDFProcessor
+    3. Clears conversation history (starts fresh with new PDF)
+    4. Returns a status message with chunk/page statistics
+    
+    Args:
+        file_path: Path to uploaded PDF file
+        
+    Returns:
+        Status message with success info or error description
+    """
     if file_path is None:
-        return "⚠️ Please upload a PDF first."
+        return "Please upload a PDF first."
 
     try:
-        # Use enhanced processor for better chunking and metadata
-        pdf_chunks = pdf_processor.process(file_path)
-        summary = pdf_processor.get_chunk_summary(pdf_chunks)
-        
+        summary = rag_chain.load_pdf(file_path)
         return (
-            f"✅ PDF loaded successfully!\n"
-            f"📊 Chunks: {summary['total_chunks']} | "
+            f"PDF loaded successfully!\n"
+            f"Chunks: {summary['total_chunks']} | "
             f"Pages: {summary['pages_extracted']} | "
             f"Avg chunk: {int(summary['avg_chunk_size'])} chars"
         )
     except ValueError as e:
-        return f"⚠️ Error loading PDF: {e}"
+        return f"Error loading PDF: {e}"
 
 def ask_question(question):
-    global conversation_history, pdf_chunks
-
+    """Process a user question through the RAG chain and return an answer.
+    
+    This function:
+    1. Validates that a PDF is loaded and API key is configured
+    2. Invokes rag_chain.answer(question) which runs: RunnableParallel | prompt | model
+    3. Returns the LLM-generated answer grounded in the PDF context
+    
+    Args:
+        question: User's question about the PDF
+        
+    Returns:
+        LLM-generated answer or error message
+    """
     if client is None:
-        return "⚠️ Set OPENAI_API_KEY or NVIDIA_API_KEY in your .env file first."
+        return "Set OPENAI_API_KEY or NVIDIA_API_KEY in your .env file first."
 
-    if not pdf_chunks:
-        return "⚠️ Please upload a PDF first."
+    if not rag_chain.chunks:
+        return "Please upload a PDF first."
 
     if not question.strip():
         return "Please ask a question about the PDF."
 
-    question_terms = [term.lower() for term in question.split() if len(term) > 2]
-
-    scored_chunks = []
-    for doc in pdf_chunks:
-        text = doc.page_content.strip()
-        lowered = text.lower()
-        score = sum(1 for term in question_terms if term in lowered)
-        scored_chunks.append((score, text))
-
-    scored_chunks.sort(key=lambda item: item[0], reverse=True)
-    top_chunks = [text for score, text in scored_chunks[:4] if score > 0]
-
-    if not top_chunks:
-        return "I don't know."
-
-    context = "\n\n".join(top_chunks)
-    history_text = format_history(conversation_history)
-    
-    system_prompt = template_loader.render("system_prompt", {})
-    user_prompt = template_loader.render(
-        "user_prompt",
-        {"history_text": history_text, "context": context, "question": question},
-    )
-    
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
     try:
-        completion = client.chat.completions.create(
-            messages=messages,
-            model=LLM_MODEL,
-            temperature=1,
-            top_p=1,
-            max_tokens=4096,
-            stream=True,
-        )
-        answer_parts = []
-        for chunk in completion:
-            if not getattr(chunk, "choices", None):
-                continue
-            delta = chunk.choices[0].delta
-            content = getattr(delta, "content", None)
-            if content:
-                answer_parts.append(content)
-        answer = "".join(answer_parts).strip()
-    except Exception as e:
-        fallback = top_chunks[0].strip()
-        answer = f"I don't know. ({e})" if not fallback else fallback
+        answer = rag_chain.answer(question)
+    except ValueError as e:
+        return str(e)
+    except RuntimeError as e:
+        return str(e)
 
-    conversation_history.append({"question": question, "answer": answer})
     return answer
 
 def ask_question_and_update(chat_history, question):
+    """Handle chat UI updates: show user question immediately, then stream the answer.
+    
+    This generator function:
+    1. Appends the user's question to chat history
+    2. Yields to update UI immediately (responsive UX)
+    3. Gets the answer via ask_question()
+    4. Appends the answer and yields final update
+    
+    Args:
+        chat_history: List of chat messages from Gradio Chatbot
+        question: User's input question
+        
+    Yields:
+        Tuples of (updated_chat_history, cleared_query_field)
+    """
     if not question.strip():
         return chat_history, ""
 
-    # 1️⃣ First, show the user's question immediately
+    # First, show the user's question immediately.
     chat_history.append({"role": "user", "content": question})
     yield chat_history, ""  # This updates the chatbox immediately
 
-    # 2️⃣ Then process the answer
+    # Then process the answer via the chain.
     answer = ask_question(question)
     chat_history.append({"role": "assistant", "content": answer})
 
-    # 3️⃣ Update chat with the assistant's response
+    # Update chat with the assistant's response.
     yield chat_history, ""
 
 
@@ -148,7 +166,7 @@ def ask_question_and_update(chat_history, question):
 # Gradio UI
 # ================================
 with gr.Blocks() as demo:
-    gr.Markdown("## 📚 PDF Insight RAG — Chat with your PDF")
+    gr.Markdown("## PDF Insight RAG - Chat with your PDF")
     
     with gr.Row(equal_height=True):
         with gr.Column(scale=1):
